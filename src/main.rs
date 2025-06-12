@@ -1,29 +1,35 @@
 use anyhow::Result;
+use axum::{http::StatusCode, response::Json, routing::get, Router};
 use nepse_auth_token::NepseCryptography;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 const AUTHENTICATE_PROVE_URL: &str = "https://nepalstock.com/api/authenticate/prove";
 
-
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct AuthenticateProveResponse {
-    accessToken: String,
-    isDisplayActive: bool,
-    popupDocFor: String,
-    refreshToken: String,
+    access_token: String,
+    is_display_active: bool,
+    popup_doc_for: String,
+    refresh_token: String,
     salt: String,
     salt1: i32,
     salt2: i32,
     salt3: i32,
     salt4: i32,
     salt5: i32,
-    serverTime: i64,
-    tokenType: String,
+    server_time: i64,
+    token_type: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct ParsedTokenResult {
     access_token: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    error: String,
 }
 
 #[derive(Debug)]
@@ -51,7 +57,10 @@ impl SaltArrays {
 }
 
 async fn make_request(url: &str) -> Result<AuthenticateProveResponse, reqwest::Error> {
-    let response: AuthenticateProveResponse = reqwest::get(url).await?.json::<AuthenticateProveResponse>().await?;
+    let response: AuthenticateProveResponse = reqwest::get(url)
+        .await?
+        .json::<AuthenticateProveResponse>()
+        .await?;
     Ok(response)
 }
 
@@ -68,7 +77,13 @@ fn calculate_crypto_indices(
     let ndx = nepse_cryptography.ndx(altered[0], altered[1], altered[2], altered[3], altered[4])?;
     let mdx = nepse_cryptography.mdx(altered[0], altered[1], altered[2], altered[3], altered[4])?;
 
-    Ok(CryptoIndices { cdx, rdx, bdx, ndx, mdx })
+    Ok(CryptoIndices {
+        cdx,
+        rdx,
+        bdx,
+        ndx,
+        mdx,
+    })
 }
 
 fn parse_access_token_with_indices(
@@ -84,7 +99,7 @@ fn parse_access_token_with_indices(
     // Ensure indices are within bounds
     let max_len = access_token.len();
     let all_indices = [cdx_usize, rdx_usize, bdx_usize, ndx_usize, mdx_usize];
-    
+
     if all_indices.iter().any(|&idx| idx >= max_len) {
         return Err("Calculated indices are out of bounds".into());
     }
@@ -115,10 +130,10 @@ fn parse_access_token_with_indices(
 
 async fn get_access_token() -> Result<ParsedTokenResult, Box<dyn std::error::Error>> {
     let response = make_request(AUTHENTICATE_PROVE_URL).await?;
-    
+
     // Create the WASM instance for cryptographic functions
     let mut nepse_cryptography = NepseCryptography::new("wasm-modules/css.wasm")?;
-    
+
     // Create salt arrays in different orders
     let salt_arrays = SaltArrays::new(
         response.salt1,
@@ -127,26 +142,43 @@ async fn get_access_token() -> Result<ParsedTokenResult, Box<dyn std::error::Err
         response.salt4,
         response.salt5,
     );
-    
+
     // Calculate cryptographic indices
     let crypto_indices = calculate_crypto_indices(&mut nepse_cryptography, &salt_arrays)?;
-    
+
     // Parse the access token using the calculated indices
-    let parsed_access_token = parse_access_token_with_indices(&response.accessToken, &crypto_indices)?;
-    
+    let parsed_access_token =
+        parse_access_token_with_indices(&response.access_token, &crypto_indices)?;
+
     Ok(ParsedTokenResult {
         access_token: parsed_access_token,
     })
 }
 
+async fn get_access_token_handler()
+-> Result<Json<ParsedTokenResult>, (StatusCode, Json<ErrorResponse>)> {
+    match get_access_token().await {
+        Ok(result) => Ok(Json(result)),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: e.to_string(),
+            }),
+        )),
+    }
+}
+
 #[tokio::main]
 async fn main() {
-    match get_access_token().await {
-        Ok(result) => {
-            println!("Parsed access token: {}", result.access_token);
-        }
-        Err(e) => {
-            eprintln!("Error getting access token: {}", e);
-        }
-    }
+    // Build our application with routes
+    let app = Router::new().route("/", get(get_access_token_handler));
+
+    // Run the server
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8888")
+        .await
+        .expect("Failed to bind to address");
+    println!("🚀 Server running on http://127.0.0.1:8888");
+    axum::serve(listener, app)
+        .await
+        .expect("Failed to start server");
 }

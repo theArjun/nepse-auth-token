@@ -1,5 +1,5 @@
-use crate::models::{CryptoIndices, SaltArrays};
-use crate::NepseCryptography;
+use crate::models::{CryptoIndices, NepseCryptography, SaltArrays};
+use wasmtime::*;
 
 pub fn calculate_crypto_indices(
     nepse_cryptography: &mut NepseCryptography,
@@ -36,7 +36,7 @@ pub fn parse_access_token_with_indices(
     // Ensure indices are within bounds
     let max_len = access_token.len();
     let all_indices = [cdx_usize, rdx_usize, bdx_usize, ndx_usize, mdx_usize];
-    
+
     if all_indices.iter().any(|&idx| idx >= max_len) {
         return Err("Calculated indices are out of bounds".into());
     }
@@ -62,4 +62,4 @@ pub fn parse_access_token_with_indices(
     }
 
     Ok(parsed_access_token)
-} 
+}

@@ -53,7 +53,6 @@ pub async fn run_server(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
     
     info!("🚀 Server running on http://127.0.0.1:{}", port);
-    info!("📋 Endpoint: GET / - Get NEPSE access token");
     
     axum::serve(listener, app).await?;
     

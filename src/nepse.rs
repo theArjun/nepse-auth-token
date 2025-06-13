@@ -1,5 +1,5 @@
 use anyhow::Result;
-use tracing::{info, debug};
+use tracing::{debug};
 use crate::models::{AuthenticateProveResponse, ParsedTokenResult, SaltArrays};
 use crate::crypto::{calculate_crypto_indices, parse_access_token_with_indices};
 use crate::NepseCryptography;

@@ -7,8 +7,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_target(false)
         .with_thread_ids(false)
-        .with_file(false)
-        .with_line_number(false)
+        .with_file(true)
+        .with_line_number(true)
         .init();
 
     run_server(8888).await

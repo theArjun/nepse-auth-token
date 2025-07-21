@@ -13,4 +13,4 @@ tower = "0.5.2"
 tower-http = { version = "0.6", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-wasmtime = "33.0.0"
+wasmtime = "33.0.2"
